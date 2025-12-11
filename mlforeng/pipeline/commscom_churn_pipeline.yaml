@@ -1,0 +1,248 @@
+# PIPELINE DEFINITION
+# Name: commscom-churn-training-pipeline-v2
+# Description: Train, evaluate, and (placeholder) register CommsCom churn model with mlforeng on OpenShift AI.
+# Inputs:
+#    model_family: str [Default: 'rf']
+#    test_size: float [Default: 0.2]
+components:
+  comp-evaluate-commscom-model:
+    executorLabel: exec-evaluate-commscom-model
+    inputDefinitions:
+      artifacts:
+        model_dir:
+          artifactType:
+            schemaTitle: system.Artifact
+            schemaVersion: 0.0.1
+    outputDefinitions:
+      artifacts:
+        metrics_dir:
+          artifactType:
+            schemaTitle: system.Artifact
+            schemaVersion: 0.0.1
+  comp-register-commscom-model:
+    executorLabel: exec-register-commscom-model
+    inputDefinitions:
+      artifacts:
+        model_dir:
+          artifactType:
+            schemaTitle: system.Artifact
+            schemaVersion: 0.0.1
+  comp-train-commscom-churn:
+    executorLabel: exec-train-commscom-churn
+    inputDefinitions:
+      parameters:
+        model_family:
+          defaultValue: rf
+          isOptional: true
+          parameterType: STRING
+        save_model_name:
+          defaultValue: commscom_rf_pipeline
+          isOptional: true
+          parameterType: STRING
+        test_size:
+          defaultValue: 0.2
+          isOptional: true
+          parameterType: NUMBER_DOUBLE
+    outputDefinitions:
+      artifacts:
+        model_dir:
+          artifactType:
+            schemaTitle: system.Artifact
+            schemaVersion: 0.0.1
+deploymentSpec:
+  executors:
+    exec-evaluate-commscom-model:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - evaluate_commscom_model
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.15.2'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
+          $0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef evaluate_commscom_model(\n    model_dir: Input[Artifact],\n \
+          \   metrics_dir: Output[Artifact],\n):\n    \"\"\"\n    Step 2: Evaluate\
+          \ the trained model.\n\n    - Reads meta.json from model_dir.\n    - Writes\
+          \ metrics.json into metrics_dir.\n    \"\"\"\n    from pathlib import Path\n\
+          \    import json\n\n    model_dir_path = Path(model_dir.path)\n    meta_path\
+          \ = model_dir_path / \"meta.json\"\n\n    print(\"=== CommsCom churn EVALUATE\
+          \ step ===\")\n    print(\"Model dir:\", model_dir_path)\n    print(\"Meta\
+          \ path:\", meta_path)\n\n    if not meta_path.exists():\n        raise FileNotFoundError(f\"\
+          meta.json not found in {model_dir_path}\")\n\n    with meta_path.open(\"\
+          r\", encoding=\"utf-8\") as f:\n        meta = json.load(f)\n\n    metrics\
+          \ = meta.get(\"metrics\", {})\n    print(\"Loaded metrics:\", metrics)\n\
+          \n    metrics_dir_path = Path(metrics_dir.path)\n    metrics_dir_path.mkdir(parents=True,\
+          \ exist_ok=True)\n\n    metrics_out_path = metrics_dir_path / \"metrics.json\"\
+          \n    with metrics_out_path.open(\"w\", encoding=\"utf-8\") as f:\n    \
+          \    json.dump(metrics, f, indent=2)\n\n    print(\"Wrote metrics to:\"\
+          , metrics_out_path)\n    print(\"=== EVALUATE step complete ===\")\n\n"
+        image: quay.io/vgrover/mlforeng-churn-train:amd64
+    exec-register-commscom-model:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - register_commscom_model
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.15.2'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
+          $0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef register_commscom_model(\n    model_dir: Input[Artifact],\n):\n\
+          \    \"\"\"\n    Step 3: 'Register' the model (placeholder).\n\n    For\
+          \ now, just checks that model.joblib exists and logs the path.\n    \"\"\
+          \"\n    from pathlib import Path\n\n    model_dir_path = Path(model_dir.path)\n\
+          \    print(\"=== CommsCom churn REGISTER step ===\")\n    print(\"Pretending\
+          \ to register model from:\", model_dir_path)\n\n    if not (model_dir_path\
+          \ / \"model.joblib\").exists():\n        raise FileNotFoundError(\"model.joblib\
+          \ not found; cannot register.\")\n\n    print(\"Model artifact present.\
+          \ Registration placeholder complete.\")\n    print(\"=== REGISTER step complete\
+          \ ===\")\n\n"
+        image: quay.io/vgrover/mlforeng-churn-train:amd64
+    exec-train-commscom-churn:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - train_commscom_churn
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.15.2'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
+          $0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef train_commscom_churn(\n    # IMPORTANT: artifact comes FIRST,\
+          \ no default\n    model_dir: Output[Artifact],\n    model_family: str =\
+          \ \"rf\",\n    test_size: float = 0.2,\n    save_model_name: str = \"commscom_rf_pipeline\"\
+          ,\n):\n    \"\"\"\n    Step 1: Train the CommsCom churn model and write\
+          \ artifacts into model_dir.\n    \"\"\"\n    import os\n    from pathlib\
+          \ import Path\n    import shutil\n\n    # Configure MLforEng training via\
+          \ env vars\n    os.environ[\"MLFORENG_MODEL_FAMILY\"] = model_family\n \
+          \   os.environ[\"MLFORENG_TEST_SIZE\"] = str(test_size)\n    os.environ[\"\
+          MLFORENG_SAVE_MODEL_NAME\"] = save_model_name\n    os.environ[\"MLFORENG_OUTPUT_DIR\"\
+          ] = \"/tmp/output\"\n\n    out_dir = Path(\"/tmp/output\")\n    out_dir.mkdir(parents=True,\
+          \ exist_ok=True)\n\n    print(\"=== CommsCom churn TRAIN step ===\")\n \
+          \   print(f\"Model family : {model_family}\")\n    print(f\"Test size  \
+          \  : {test_size}\")\n    print(f\"Save name    : {save_model_name}\")\n\
+          \    print(f\"Output dir   : {out_dir}\")\n\n    # Run the training step\
+          \ from our module (inside the image)\n    from mlforeng.pipeline.train_churn_step\
+          \ import main as train_main\n\n    train_main()\n\n    # model_dir is an\
+          \ Artifact; .path is where KFP expects us to write files\n    model_dir_path\
+          \ = Path(model_dir.path)\n    model_dir_path.mkdir(parents=True, exist_ok=True)\n\
+          \n    for p in out_dir.iterdir():\n        if p.is_file():\n           \
+          \ print(f\"Copying artifact {p.name} -> {model_dir_path}\")\n          \
+          \  shutil.copy2(p, model_dir_path / p.name)\n\n    print(\"Contents of model_dir:\"\
+          , list(model_dir_path.iterdir()))\n    print(\"=== TRAIN step complete ===\"\
+          )\n\n"
+        image: quay.io/vgrover/mlforeng-churn-train:amd64
+pipelineInfo:
+  description: Train, evaluate, and (placeholder) register CommsCom churn model with
+    mlforeng on OpenShift AI.
+  name: commscom-churn-training-pipeline-v2
+root:
+  dag:
+    tasks:
+      evaluate-commscom-model:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-evaluate-commscom-model
+        dependentTasks:
+        - train-commscom-churn
+        inputs:
+          artifacts:
+            model_dir:
+              taskOutputArtifact:
+                outputArtifactKey: model_dir
+                producerTask: train-commscom-churn
+        taskInfo:
+          name: evaluate-commscom-model
+      register-commscom-model:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-register-commscom-model
+        dependentTasks:
+        - train-commscom-churn
+        inputs:
+          artifacts:
+            model_dir:
+              taskOutputArtifact:
+                outputArtifactKey: model_dir
+                producerTask: train-commscom-churn
+        taskInfo:
+          name: register-commscom-model
+      train-commscom-churn:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-train-commscom-churn
+        inputs:
+          parameters:
+            model_family:
+              componentInputParameter: model_family
+            save_model_name:
+              runtimeValue:
+                constant: commscom_rf_pipeline
+            test_size:
+              componentInputParameter: test_size
+        taskInfo:
+          name: train-commscom-churn
+  inputDefinitions:
+    parameters:
+      model_family:
+        defaultValue: rf
+        isOptional: true
+        parameterType: STRING
+      test_size:
+        defaultValue: 0.2
+        isOptional: true
+        parameterType: NUMBER_DOUBLE
+schemaVersion: 2.1.0
+sdkVersion: kfp-2.15.2

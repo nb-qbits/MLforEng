@@ -1,0 +1,31 @@
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: ResourceFlavor
+metadata:
+  name: default-flavor
+  namespace: ray-finetune-llm-deepspeed002
+spec:
+  nodeLabels:
+    node.kubernetes.io/instance-type: g6.2xlarge
+  taints:
+  - key: nvidia.com/gpu
+    value: "True"
+    effect: NoSchedule
+
+---
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: ClusterQueue
+metadata:
+  name: ray-gpu-queue
+spec:
+  namespaceSelector: {}
+  resourceGroups:
+  - coveredResources: ["cpu", "memory", "nvidia.com/gpu"]
+    flavors:
+    - name: default-flavor
+      resources:
+      - name: "cpu"
+        nominalQuota: "96"
+      - name: "memory"
+        nominalQuota: "512Gi"
+      - name: "nvidia.com/gpu"
+        nominalQuota: "8"

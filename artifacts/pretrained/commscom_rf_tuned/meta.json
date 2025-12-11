@@ -1,0 +1,11 @@
+{
+  "config": {
+    "model_name": "rf_tuned",
+    "dataset": "commscom_churn",
+    "notes": "GridSearchCV-tuned RF in Module 04"
+  },
+  "metrics": {
+    "roc_auc_baseline": 0.9169664302546905,
+    "roc_auc_tuned": 0.9178373969002087
+  }
+}

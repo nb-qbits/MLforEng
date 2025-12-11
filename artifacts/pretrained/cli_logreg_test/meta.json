@@ -1,0 +1,12 @@
+{
+  "config": {
+    "model_name": "logreg",
+    "n_samples": 500,
+    "n_features": 10,
+    "test_size": 0.2,
+    "save_model_name": "cli_logreg_test"
+  },
+  "metrics": {
+    "accuracy": 0.86
+  }
+}

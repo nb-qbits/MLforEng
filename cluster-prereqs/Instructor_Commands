@@ -1,0 +1,10 @@
+# Instructor commands
+# Run the following commands to set up the cluster
+
+oc apply -f 06_llama3_openshift_ai/cluster-prereqs/03_rbac_notebook_ray.yaml
+oc apply -f 06_llama3_openshift_ai/cluster-prereqs/01_gpu_flavor_and_queue.yaml
+oc apply -f 06_llama3_openshift_ai/cluster-prereqs/02_ray_localqueue_and_cluster.yaml
+
+# Check the cluster
+chmod +x 06_llama3_openshift_ai/cluster-prereqs/scripts/check-ray-prereqs.sh
+06_llama3_openshift_ai/cluster-prereqs/scripts/check-ray-prereqs.sh

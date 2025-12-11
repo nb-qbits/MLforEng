@@ -1,0 +1,18 @@
+{
+  "config": {
+    "dataset": "synthetic",
+    "model_name": "logreg",
+    "n_samples": 500,
+    "n_features": 10,
+    "test_size": 0.2,
+    "save_model_name": "module01_logreg"
+  },
+  "metrics": {
+    "accuracy": 0.86
+  },
+  "extra": {
+    "dataset": "synthetic",
+    "n_samples": 500,
+    "n_features": 10
+  }
+}

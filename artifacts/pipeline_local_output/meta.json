@@ -1,0 +1,17 @@
+{
+  "config": {
+    "model_name": "rf",
+    "dataset": "commscom_churn",
+    "save_model_name": "commscom_rf_pipeline",
+    "test_size": 0.2
+  },
+  "metrics": {
+    "roc_auc": 0.9166350380676154,
+    "n_train_rows": 5271,
+    "n_test_rows": 1318
+  },
+  "extra": {
+    "dataset": "commscom_churn",
+    "source": "pipeline_step"
+  }
+}
