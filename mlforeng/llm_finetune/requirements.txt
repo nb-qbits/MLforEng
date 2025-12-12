@@ -6,3 +6,4 @@ transformers==4.44.0
 deepspeed
 dm-tree
 ray[train]
+scikit-learn
