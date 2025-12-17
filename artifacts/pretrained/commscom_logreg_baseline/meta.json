@@ -1,0 +1,57 @@
+{
+  "config": {
+    "dataset": "commscom_churn",
+    "model_name": "logreg",
+    "n_samples": 1000,
+    "n_features": 20,
+    "test_size": 0.2,
+    "save_model_name": "commscom_logreg_baseline"
+  },
+  "metrics": {
+    "accuracy": 0.8292867981790591,
+    "roc_auc": 0.9069496057282698
+  },
+  "extra": {
+    "dataset": "commscom_churn",
+    "n_train_rows": 5271,
+    "n_features": 34,
+    "num_cols": [
+      "Age",
+      "Number of Dependents",
+      "Zip Code",
+      "Latitude",
+      "Longitude",
+      "Number of Referrals",
+      "Tenure in Months",
+      "Avg Monthly Long Distance Charges",
+      "Avg Monthly GB Download",
+      "Monthly Charge",
+      "Total Charges",
+      "Total Refunds",
+      "Total Extra Data Charges",
+      "Total Long Distance Charges",
+      "Total Revenue"
+    ],
+    "cat_cols": [
+      "Gender",
+      "Married",
+      "City",
+      "Offer",
+      "Phone Service",
+      "Multiple Lines",
+      "Internet Service",
+      "Internet Type",
+      "Online Security",
+      "Online Backup",
+      "Device Protection Plan",
+      "Premium Tech Support",
+      "Streaming TV",
+      "Streaming Movies",
+      "Streaming Music",
+      "Unlimited Data",
+      "Contract",
+      "Paperless Billing",
+      "Payment Method"
+    ]
+  }
+}

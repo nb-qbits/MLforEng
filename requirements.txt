@@ -1,0 +1,10 @@
+numpy
+pandas
+scikit-learn
+jupyterlab
+fastapi
+uvicorn[standard]
+requests
+scikit-learn
+# Include LLM fine-tuning requirements
+-r mlforeng/llm_finetune/requirements.txt

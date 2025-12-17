@@ -1,0 +1,10 @@
+# Instructor commands
+# Run the following commands to set up the cluster
+
+oc apply -f cluster-prereqs/03_rbac_notebook_ray.yaml
+oc apply -f cluster-prereqs/01_gpu_flavor_and_queue.yaml
+oc apply -f cluster-prereqs/02_ray_localqueue_and_cluster.yaml
+
+# Check the cluster
+chmod +x cluster-prereqs/scripts/check-ray-prereqs.sh
+cluster-prereqs/scripts/check-ray-prereqs.sh

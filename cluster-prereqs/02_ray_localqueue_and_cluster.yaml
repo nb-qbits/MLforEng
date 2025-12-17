@@ -1,0 +1,80 @@
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: LocalQueue
+metadata:
+  name: local-queue-ray
+  namespace: ray-finetune-llm-deepspeed002
+spec:
+  clusterQueue: ray-gpu-queue
+---
+apiVersion: ray.io/v1
+kind: RayCluster
+metadata:
+  name: ray
+  namespace: ray-finetune-llm-deepspeed002
+  labels:
+    kueue.x-k8s.io/queue-name: "local-queue-ray"
+spec:
+  rayVersion: "2.35.0"
+  headGroupSpec:
+    rayStartParams:
+      dashboard-host: "0.0.0.0"
+    template:
+      metadata:
+        labels:
+          kueue.x-k8s.io/queue-name: "local-queue-ray"
+      spec:
+        envFrom:
+        - secretRef:
+            name: aws-creds
+        nodeSelector:
+          node.kubernetes.io/instance-type: g6.2xlarge
+        tolerations:
+        - key: "nvidia.com/gpu"
+          operator: "Equal"
+          value: "True"
+          effect: "NoSchedule"
+        containers:
+        - name: ray-head
+          image: quay.io/rhoai/ray:2.35.0-py311-cu121-torch24-fa26
+          resources:
+            requests:
+              cpu: "4"
+              memory: "22Gi"
+              nvidia.com/gpu: "1"
+            limits:
+              cpu: "4"
+              memory: "22Gi"
+              nvidia.com/gpu: "1"
+  workerGroupSpecs:
+  - groupName: small-group
+    replicas: 6
+    minReplicas: 0
+    maxReplicas: 6
+    rayStartParams: {}
+    template:
+      metadata:
+        labels:
+          kueue.x-k8s.io/queue-name: "local-queue-ray"
+      spec:
+        envFrom:
+        - secretRef:
+            name: aws-creds
+        nodeSelector:
+          node.kubernetes.io/instance-type: g6.2xlarge
+        tolerations:
+        - key: "nvidia.com/gpu"
+          operator: "Equal"
+          value: "True"
+          effect: "NoSchedule"
+        containers:
+        - name: ray-worker
+          image: quay.io/rhoai/ray:2.35.0-py311-cu121-torch24-fa26
+          resources:
+            requests:
+              cpu: "4"
+              memory: "22Gi"
+              nvidia.com/gpu: "1"
+            limits:
+              cpu: "4"
+              memory: "22Gi"
+              nvidia.com/gpu: "1"

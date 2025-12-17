@@ -1,0 +1,27 @@
+# Containerfile.train / Dockerfile.train – training container for CommsCom churn (pipeline steps)
+
+FROM python:3.11-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+WORKDIR /app
+
+# No apt-get; rely on Python wheels for dependencies
+COPY requirements.txt ./requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Project code + artifacts
+COPY mlforeng ./mlforeng
+COPY artifacts ./artifacts
+
+# Default env vars (pipeline will override if needed)
+ENV MLFORENG_MODEL_FAMILY=rf
+ENV MLFORENG_TEST_SIZE=0.2
+ENV MLFORENG_SAVE_MODEL_NAME=commscom_rf_pipeline
+ENV MLFORENG_OUTPUT_DIR=/output
+
+RUN mkdir -p /output
+
+# Entrypoint – used by our train component
+CMD ["python", "-m", "mlforeng.pipeline.train_churn_step"]

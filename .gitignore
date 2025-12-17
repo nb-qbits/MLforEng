@@ -1,0 +1,15 @@
+.venv/
+venv/
+*.dylib
+*.so
+*.joblib
+*.pkl
+models/
+aws_creds.sh
+download_model.py
+hf_creds.sh
+__pycache__/
+.venv/
+.venv/
+__pycache__/
+*.pyc
