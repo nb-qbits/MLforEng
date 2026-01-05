@@ -1,0 +1,24 @@
+# Run from Repo Root
+# cd /Users/vgrover/Downloads/software/support-ai-portal/support-ai-portal
+python3 - <<EOF
+import pandas as pd
+
+df = pd.read_csv("data/ran_kpis.csv")
+
+def score(row):
+    issues = 0
+    issues += row["rsrp_avg"] < -105
+    issues += row["sinr_avg"] < 5
+    issues += row["congestion_pct"] > 85
+    issues += row["packet_loss_pct"] > 3
+    issues += row["handover_failures"] > 8
+    return issues
+
+df["network_issue_score"] = df.apply(score, axis=1)
+
+print(
+    df.sort_values("network_issue_score", ascending=False)
+      [["customer_id","cell_id","network_issue_score"]]
+      .head(5)
+)
+EOF

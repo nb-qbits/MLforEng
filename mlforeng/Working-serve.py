@@ -6,9 +6,7 @@ import os
 import shap
 from functools import lru_cache
 from typing import List, Dict, Any
-from pathlib import Path
 import requests
-import uuid
 
 import numpy as np
 import pandas as pd
@@ -16,26 +14,6 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 from .predict import load_trained_model, predict_array, predict_dataframe
-import json
-from pathlib import Path
-
-LEDGER_FILE = Path("mcp_action_ledger.json")
-if LEDGER_FILE.exists():
-    ACTION_LOG = json.loads(LEDGER_FILE.read_text())
-else:
-    ACTION_LOG = []
-
-# --- BACKFILL IDS FOR LEGACY RECORDS ---
-updated = False
-for i, action in enumerate(ACTION_LOG):
-    if "id" not in action:
-        action["id"] = f"legacy-{i}"
-        updated = True
-
-if updated:
-    LEDGER_FILE.write_text(json.dumps(ACTION_LOG, indent=2))
-
-
 
 RHOAI_LLM_BASE_URL = os.getenv("RHOAI_LLM_BASE_URL")
 RHOAI_LLM_API_KEY = os.getenv("RHOAI_LLM_API_KEY")
@@ -81,37 +59,6 @@ class ChurnLLMSummaryRequest(BaseModel):
 
 class ChurnLLMSummaryResponse(BaseModel):
     summary: str
-
-class RecommendActionsRequest(BaseModel):
-    customer_id: str
-    prediction: int
-    probability: float | None
-    top_features: list[dict]
-
-class RecommendActionsResponse(BaseModel):
-    risk_level: str
-    recommended_actions: list[str]
-    confidence: str
-class RanCorrelationRequest(BaseModel):
-    customer_id: str
-
-class RanCorrelationResponse(BaseModel):
-    network_impact: str
-    affected_cells: list[str]
-    kpi_issues: list[str]
-    confidence: str
-
-class RanExplanationRequest(BaseModel):
-    customer_id: str
-    churn_probability: float | None
-    churn_drivers: list[str]
-    network_impact: str
-    kpi_issues: list[str]
-    affected_cells: list[str]
-
-class RanExplanationResponse(BaseModel):
-    explanation: str
-
 
 
 # ---------- FastAPI app ----------
@@ -214,76 +161,6 @@ def summarize_churn(req: ChurnLLMSummaryRequest):
         )
 
 
-@app.post("/correlate_ran", response_model=RanCorrelationResponse)
-def correlate_ran(req: RanCorrelationRequest):
-    import pandas as pd
-
-    ran_df = pd.read_csv("data/ran_kpis.csv")
-
-    cust_df = ran_df[ran_df["customer_id"] == req.customer_id]
-
-    if cust_df.empty:
-        return {
-            "network_impact": "Unknown",
-            "affected_cells": [],
-            "kpi_issues": [],
-            "confidence": "Low",
-        }
-
-    row = cust_df.iloc[0]
-
-    issues = []
-    if row["rsrp_avg"] < -105:
-        issues.append("Low signal strength (RSRP)")
-    if row["sinr_avg"] < 5:
-        issues.append("Poor signal quality (SINR)")
-    if row["congestion_pct"] > 85:
-        issues.append("High cell congestion")
-    if row["packet_loss_pct"] > 3:
-        issues.append("Elevated packet loss")
-    if row["handover_failures"] > 8:
-        issues.append("Excessive handover failures")
-
-    if len(issues) >= 2:
-        impact = "High"
-        confidence = "High"
-    elif len(issues) == 1:
-        impact = "Medium"
-        confidence = "Medium"
-    else:
-        impact = "Low"
-        confidence = "High"
-
-    return {
-        "network_impact": impact,
-        "affected_cells": [row["cell_id"]],
-        "kpi_issues": issues,
-        "confidence": confidence,
-    }
-
-
-@app.post("/explain_churn_ran", response_model=RanExplanationResponse)
-def explain_churn_ran(req: RanExplanationRequest):
-    prompt = f"""
-You are a telecom support expert.
-
-Customer churn probability: {req.churn_probability}
-Top customer drivers: {req.churn_drivers}
-
-Network impact level: {req.network_impact}
-Affected cells: {req.affected_cells}
-Network issues observed: {req.kpi_issues}
-
-Explain in 2–3 sentences whether churn risk
-is driven by customer factors, network factors,
-or a combination of both.
-
-Use clear, operational language.
-"""
-
-    explanation = llm_summarize(prompt)
-
-    return {"explanation": explanation}
 
 
 # ---------- Numeric / synthetic ----------
@@ -412,143 +289,3 @@ def predict_churn(req: ChurnPredictRequest):
         predictions=[int(p) for p in preds],
         probabilities=[float(p) if p is not None else None for p in probs],
     )
-
-@app.post("/recommend_actions", response_model=RecommendActionsResponse)
-def recommend_actions(req: RecommendActionsRequest):
-    # 1️⃣ Determine risk
-    if req.probability is not None:
-        if req.probability > 0.7:
-            risk_level = "High"
-        elif req.probability > 0.4:
-            risk_level = "Medium"
-        else:
-            risk_level = "Low"
-    else:
-        risk_level = "Unknown"
-
-    # 2️⃣ Build LLM prompt
-    prompt = f"""
-You are a telecom customer support strategist.
-
-Customer risk level: {risk_level}
-Churn probability: {req.probability}
-
-Key risk drivers:
-{req.top_features}
-
-Return 3–5 concise, operational actions
-for a Tier-1 support engineer.
-
-Rules:
-- No marketing language
-- No hallucinations
-- Actionable steps only
-"""
-
-    # 3️⃣ Call LLM (reuse your existing LLM function)
-    llm_text = llm_summarize(prompt)
-
-    # 4️⃣ Parse actions (simple, safe)
-    actions = [
-        line.strip("- ").strip()
-        for line in llm_text.splitlines()
-        if line.strip()
-    ][:5]
-
-    return {
-        "risk_level": risk_level,
-        "recommended_actions": actions,
-        "confidence": "High" if risk_level in ["High", "Low"] else "Medium",
-    }
-
-# -------------------------------
-# MCP-style Action Ledger
-# -------------------------------
-
-if LEDGER_FILE.exists():
-    try:
-        content = LEDGER_FILE.read_text().strip()
-        ACTION_LOG = json.loads(content) if content else []
-    except Exception as e:
-        print("⚠️ Invalid MCP ledger, resetting:", e)
-        ACTION_LOG = []
-else:
-    ACTION_LOG = []
-
-
-
-from pydantic import BaseModel
-
-class ActionExecutionRequest(BaseModel):
-    action_type: str
-    severity: str
-    customer_id: str
-    context: dict
-
-
-@app.post("/mcp/execute_action")
-def execute_action(req: ActionExecutionRequest):
-    record = {
-        "id": str(uuid.uuid4()),
-        "action_type": req.action_type,
-        "severity": req.severity,
-        "customer_id": req.customer_id,
-        "context": req.context,
-        "status": "draft"
-    }
-
-    print("MCP EXECUTE CALLED")
-    print("Writing ledger to:", LEDGER_FILE.resolve())
-
-    ACTION_LOG.append(record)
-    LEDGER_FILE.write_text(json.dumps(ACTION_LOG, indent=2))
-
-    return {
-        "status": "executed",
-        "record": record
-    }
-
-
-@app.get("/mcp/actions")
-def list_actions():
-    print("MCP ACTIONS READ, count =", len(ACTION_LOG))
-    return {
-        "count": len(ACTION_LOG),
-        "actions": ACTION_LOG
-    }
-
-def persist_ledger():
-    """Save the action ledger to disk."""
-    LEDGER_FILE.write_text(json.dumps(ACTION_LOG, indent=2))
-
-@app.post("/mcp/promote_action")
-def promote_action(payload: dict):
-    action_id = payload.get("action_id")
-
-    if not action_id:
-        raise HTTPException(status_code=400, detail="action_id required")
-
-    for action in ACTION_LOG:
-        if action["id"] == action_id:
-            if action["status"] != "draft":
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Action already {action['status']}"
-                )
-
-            # 🔒 MCP gate
-            action["status"] = "executed"
-
-            # 🎭 Demo side-effect (Jira placeholder)
-            action["external_ref"] = {
-                "system": "JIRA",
-                "ticket": f"JIRA-{len(ACTION_LOG)+1000}"
-            }
-
-            persist_ledger()
-            return {
-                "status": "executed",
-                "record": action
-            }
-
-    raise HTTPException(status_code=404, detail="Action not found")
